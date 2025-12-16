@@ -1,23 +1,28 @@
-import discord
+# 1. Standard library imports
 import os
-import yt_dlp
-from discord.ext import commands
 import calendar
 import asyncio
-from discord.utils import get
-from discord import FFmpegPCMAudio
 import shutil
 import random
 import glob
 import math
 import re
+import json
+from urllib.parse import parse_qs, urlparse
+
+# 2. Third-party imports
+import yt_dlp
 from tinytag import TinyTag
 import mutagen
 from mutagen.mp4 import MP4
-from urllib.parse import parse_qs, urlparse
 import googleapiclient.discovery
 import nacl
-import json
+
+# 3. Discord-related imports
+import discord
+from discord.ext import commands
+from discord.utils import get
+from discord import FFmpegPCMAudio
 
 with open('tokens.json', 'r') as file:
     tokens = json.load(file)

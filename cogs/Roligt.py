@@ -1,22 +1,25 @@
-import discord
-import json
-import os
-import random
-from random import randint
-from discord.ext import commands
+# 1. Standard library imports
+import asyncio
+import calendar
 import datetime
 from datetime import date
-import calendar
+import glob
+import json
+import os
+from os import system
+import random
+from random import randint
+import re
+import shutil
+
+# 2. Third-party imports
+import discord
+from discord.ext import commands
 from discord.utils import get
 from discord import FFmpegPCMAudio
-from os import system
-import asyncio
-import shutil
-import glob
 import praw
 import pybible
-# from pybible import pybible_load
-import re
+
 
 with open('tokens.json', 'r') as file:
     tokens = json.load(file)

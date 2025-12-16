@@ -1,9 +1,12 @@
-import discord
+# 1. Standard library imports
+import asyncio
 import json
 import random
 from random import randint
+
+# 2. Third-party imports
+import discord
 from discord.ext import commands
-import asyncio
 
 #butik
 varor = 'lambsauce','brest'

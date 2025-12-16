@@ -1,10 +1,12 @@
-﻿import discord
+﻿# 1. Standard library imports
 import os
-from discord.ext import commands
-from discord import User
-from discord import Game
-import nacl
 import json
+
+# 2. Third-party imports
+import discord
+from discord.ext import commands
+from discord import User, Game
+import nacl
 
 with open('tokens.json', 'r') as file:
     tokens = json.load(file)

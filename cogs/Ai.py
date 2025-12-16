@@ -1,12 +1,20 @@
-import discord
-from discord.ext import commands
+# 1. Standard library imports
+import asyncio
+import json
 import random
 from random import randint
-import asyncio
-from ollama import chat
 import subprocess
+
+# 2. Third-party library imports
+import discord
+from discord.ext import commands
 from PIL import Image
-import json
+import torch
+import torch_directml
+from diffusers import StableDiffusionPipeline, AutoPipelineForText2Image
+
+# 3. Local application/library-specific imports
+from ollama import chat
 
 with open('tokens.json', 'r') as file:
     tokens = json.load(file)
@@ -56,17 +64,26 @@ class Ai(commands.Cog):
 
     @commands.command(pass_context=True)
     async def generera(self, ctx, *, prompt: str):
-        # Run the helper script inside the conda environment in a thread
-        result = await asyncio.to_thread(
-            subprocess.run,
-            [conda_exe, "run", "-n", "ai_env", "python", f"{tokens['user_folder']}gen.py", prompt],
-            capture_output=True,
-            text=True
+        pipe = AutoPipelineForText2Image.from_pretrained(
+            "stabilityai/sdxl-turbo",
+            torch_dtype=torch.float16,
+            variant="fp16"
         )
+        # pipe = AutoPipelineForText2Image.from_pretrained(
+        #     "stabilityai/sd-turbo",
+        #     torch_dtype=torch.float16,
+        #     variant="fp16"
+        # )
+        # pipe = StableDiffusionPipeline.from_pretrained(
+        #     "runwayml/stable-diffusion-v1-5",
+        #     torch_dtype=torch.float16,
+        #     variant="fp16"
+        # )
+        pipe = pipe.to(torch_directml.device())
 
-        # Debug output
-        print(result.stdout)
-        print(result.stderr)
+        image = pipe(f'{prompt}, photorealistic, 8k',num_inference_steps=4, guidance_scale=0.0).images[0]
+        output_path = "output.png"
+        image.save(output_path)
 
         # Send the generated file back to Discord
         await ctx.send(
