@@ -1,9 +1,7 @@
 import discord
 import os
-import youtube_dl
+import yt_dlp
 from discord.ext import commands
-import calendar
-import asyncio
 from discord.utils import get
 from discord import FFmpegPCMAudio
 from os import system
@@ -11,46 +9,71 @@ import shutil
 import random
 import glob
 import math
-import re
 from tinytag import TinyTag
-import mutagen
 from mutagen.mp4 import MP4
 from mutagen.mp3 import MP3
-import urllib.request
-from bs4 import BeautifulSoup
-import requests
-import time
+from collections import deque
+import asyncio
 
-#spara låtar i en mapp så man slipper ladda ner dom
-queue_number = 1
+ytdl = yt_dlp.YoutubeDL({
+    "format": "bestaudio/best",
+    "quiet": True,
+})
+
+class DJEdward:
+    def __init__(self):
+        self.queue = deque()
+        self.current = None
 
 class Ljuduppspelning(commands.Cog):
 
-    async def flytta(self, från, till):
-        från=int(från)
-        till=int(till)
-        files=glob.glob("queue/*.m4a")
-        flyttnummer=int(os.path.splitext(os.path.basename(files[till]))[0],10)
-        file_som_flyttas=files[från]
-        file_som_flyttas_name = "{0:03}a.m4a".format(flyttnummer)
-        os.rename(file_som_flyttas, file_som_flyttas_name)
-        shutil.move(file_som_flyttas_name, "queue/")
-
-        for i in range(till,från):
-            nummer=int(os.path.splitext(os.path.basename(files[i+1]))[0],10)
-            filename = "{0:03}a.m4a".format(nummer)
-            os.rename(files[i], filename)
-            shutil.move(filename, "queue/")
-
-        for i in range(till,från+1): 
-            nummer=int(os.path.splitext(os.path.basename(files[i]))[0],10)
-            filename = "{0:03}.m4a".format(nummer)
-            os.rename("{}a.m4a".format(os.path.splitext(files[i])[0]), filename)
-            shutil.move(filename, "queue/")
-
     def __init__(self, bot):
         self.bot = bot
-        #self.bot.loop.create_task(self.queue_sak())
+        self.players = {}
+
+    def get_player(self, server_id):
+        if server_id not in self.players:
+            self.players[server_id] = DJEdward()
+        return self.players[server_id]
+    
+    async def get_song(self, query):
+        def extract():
+            if query.startswith("http"):
+                return ytdl.extract_info(
+                    query,
+                    download=False
+                )
+            results = ytdl.extract_info(
+                f"ytsearch1:{query}",
+                download=False
+            )
+            return results["entries"][0]
+        return await asyncio.to_thread(extract)
+    
+    async def play_next(self, ctx):
+        player = self.get_player(ctx.guild.id)
+        if not player.queue:
+            await ctx.send("Queue is empty.")
+            return
+        song = player.queue.popleft()
+        player.current = song
+        voice = ctx.voice_client
+        if voice is None:
+            voice = await ctx.author.voice.channel.connect()
+        source = await discord.FFmpegOpusAudio.from_probe(
+            song["url"],
+            options="-vn"
+        )
+        def after_playing(error):
+            future = self.play_next(ctx)
+            asyncio.run_coroutine_threadsafe(
+                future,
+                self.bot.loop
+            )
+        voice.play(source, after=after_playing)
+        await ctx.send(
+            f"🎵 Now playing: {song['title']}"
+        )
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -72,209 +95,22 @@ class Ljuduppspelning(commands.Cog):
         else:
             await ctx.send("Jag är inte i en röstkanal")
 
-    @commands.command(pass_context = True)
-    async def play(self, ctx, *, song: str = None):
-        global queue_number
-        voice = get(self.bot.voice_clients, guild = ctx.guild)
-        if not voice:
-            channel = ctx.message.author.voice.channel
-            voice = await channel.connect()
-
-        def playsong():
-            try:
-                if not voice.is_playing():
-                    songs = glob.glob('queue/*.m4a')
-                    song = songs[0]
-                    voice.play(discord.FFmpegPCMAudio(song), after = lambda e:(os.remove(song), playsong()))
-                    voice.is_playing()
-            except:
-                pass
-
-        if song == None:
-            playsong()
-
-        if not song == None:
-            #låtnerladdning
-            ydl_opts = {
-                    'default_search': 'auto',
-                    'format': '140',
-                    'extractaudio': True,
-                    'audioformat': 'best',
-                    'age_limit': 30,
-				    'noplaylist': True,
-                }
-            with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                try:
-                    result = ydl.extract_info(song,download = False)
-                except:
-                    pass
-                try:
-                    result =result['entries'][0]
-                except:
-                    pass
-            try:
-                if result['duration']<6000:
-                    fails=0
-                    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([result['webpage_url']])
-                        for file in os.listdir("./"):
-                            if file.endswith(".m4a"):
-                                tags = MP4(file).tags
-                                tags["\xa9nam"] = "{}".format(result['title'])
-                                tags["\xa9cmt"] = "{}".format(result['webpage_url'])
-                                tags.save(file)
-                            
-                                #filename= "{} {}.m4a".format(queue_number,result['title'])
-                                #filename=re.sub('[^a-zA-Z0-9-_.åäö]', ' ', filename)
-                                filename = "{0:03}.m4a".format(queue_number)
-                                os.rename(file, filename)
-                                shutil.move(filename, "queue/")
-
-                    print(result['title'],result['webpage_url'])
-                    embed=discord.Embed(title="Lade till en video i kön", description='')
-                    embed.set_thumbnail(url="https://media.giphy.com/media/iKHHyziV1ju7nmxywh/giphy.gif")
-                    embed.add_field(name='Video', value="[{}]({})".format(result['title'],result['webpage_url']), inline=True)
-                    embed.add_field(name='Längd', value='{}:{}'.format(math.floor(int(result['duration'])/60),int(result['duration'])%60), inline=True)
-                    await ctx.send(embed=embed)
-                    queue_number+=1
-                    playsong()
-                else:
-                    await ctx.send("För lång video")
-            except Exception as e: await ctx.send(e)
+    @commands.command()
+    async def play(self, ctx, *, query):
+        player = self.get_player(ctx.guild.id)
+        song = await self.get_song(query)
+        player.queue.append(song)
+        embed=discord.Embed(title="Lade till en video i kön", description='')
+        embed.set_thumbnail(url="https://media.giphy.com/media/iKHHyziV1ju7nmxywh/giphy.gif")
+        embed.add_field(name='Video', value="[{}]({})".format(song['title'],song['webpage_url']), inline=True)
+        embed.add_field(name='Längd', value='{}:{}'.format(math.floor(int(song['duration'])/60),int(song['duration'])%60), inline=True)
+        await ctx.send(embed=embed)
 
     @commands.command(pass_context = True)
     async def playtop(self, ctx, *, song: str = None):
-        global queue_number
-        voice = get(self.bot.voice_clients, guild = ctx.guild)
-        if not voice:
-            channel = ctx.message.author.voice.channel
-            voice = await channel.connect()
-
-        def playsong():
-            try:
-                if not voice.is_playing():
-                    songs = glob.glob('queue/*.m4a')
-                    song = songs[0]
-                    voice.play(discord.FFmpegPCMAudio(song), after = lambda e:(os.remove(song), playsong()))
-                    voice.is_playing()
-            except:
-                pass
-
-        if song == None:
-            playsong()
-
-        if not song == None:
-            #låtnerladdning
-            ydl_opts = {
-                    'default_search': 'auto',
-                    'format': '140',
-                    'extractaudio': True,
-                    'audioformat': 'best',
-                    'age_limit': 30,
-				    'noplaylist': True,
-                }
-            with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                try:
-                    result = ydl.extract_info(song,download = False)
-                except:
-                    pass
-                try:
-                    result =result['entries'][0]
-                except:
-                    pass
-            try:
-                if result['duration']<1800:
-                    fails=0
-                    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([result['webpage_url']])
-                        for file in os.listdir("./"):
-                            if file.endswith(".m4a"):
-                                tags = MP4(file).tags
-                                tags["\xa9nam"] = "{}".format(result['title'])
-                                tags["\xa9cmt"] = "{}".format(result['webpage_url'])
-                                tags.save(file)
-                            
-                                #filename= "{} {}.m4a".format(queue_number,result['title'])
-                                #filename=re.sub('[^a-zA-Z0-9-_.åäö]', ' ', filename)
-                                filename = "{0:03}.m4a".format(queue_number)
-                                os.rename(file, filename)
-                                shutil.move(filename, "queue/")
-
-                                files=glob.glob("queue/*.m4a")
-                                await self.flytta(files.index("queue\\{}".format(filename)),1)
-
-                    print(result['title'],result['webpage_url'])
-                    embed=discord.Embed(title="Lade till en video först i kön", description='')
-                    embed.set_thumbnail(url="https://media.giphy.com/media/iKHHyziV1ju7nmxywh/giphy.gif")
-                    embed.add_field(name='Video', value="[{}]({})".format(result['title'],result['webpage_url']), inline=True)
-                    embed.add_field(name='Längd', value='{}:{}'.format(math.floor(int(result['duration'])/60),int(result['duration'])%60), inline=True)
-                    await ctx.send(embed=embed)
-                    queue_number+=1
-                    playsong()
-                else:
-                    await ctx.send("För lång video")
-            except:
-                await ctx.send(Exception)
 
     @commands.command(pass_context = True)
     async def playlist(self, ctx, url, index=1):
-        global queue_number
-        voice = get(self.bot.voice_clients, guild = ctx.guild)
-        if not voice:
-            channel = ctx.message.author.voice.channel
-            voice = await channel.connect()
-        def playsong():
-            try:
-                if not voice.is_playing():
-                    songs = glob.glob('queue/*.m4a')
-                    song = songs[0]
-                    voice.play(discord.FFmpegPCMAudio(song), after = lambda e:(os.remove(song), playsong()))
-                    voice.is_playing()
-            except:
-                print(Exception)
-        
-        idlista = []
-        sourceCode = requests.get(url).text
-        soup = BeautifulSoup(sourceCode, 'html.parser')
-        domain = 'https://www.youtube.com'
-        for link in soup.find_all("a", {"dir": "ltr"}):
-            href = link.get('href')
-            if href.startswith('/watch?'):
-                idlista.append(domain + href)
-        print(idlista)
-
-        ydl_opts = {
-                'default_search': 'auto',
-                'format': '140',
-                'extractaudio': True,
-                'audioformat': 'best',
-                'age_limit': 30,
-	            'noplaylist': True,
-                }
-            
-        for i in idlista[(index-1)*10:index*10]:
-            with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                try:
-                    result = ydl.extract_info(i,download = True)
-                    for file in os.listdir("./"):
-                        if file.endswith(".m4a"):
-                            tags = MP4(file).tags
-                            tags["\xa9nam"] = "{}".format(result['title'])
-                            tags["\xa9cmt"] = "{}".format(result['webpage_url'])
-                            tags.save(file)
-                            
-                            filename = "{0:03}.m4a".format(queue_number)
-                            os.rename(file, filename)
-                            shutil.move(filename, "queue/")
-                            print(queue_number, ":", result['title'], result['webpage_url'])
-                except:
-                    pass
-                queue_number+=1
-                playsong()
-        embed=discord.Embed(title="Lade till låt {} - {} från spellistan i kön".format((index-1)*10,index*10), description='')
-        embed.set_thumbnail(url="https://media.giphy.com/media/iKHHyziV1ju7nmxywh/giphy.gif")
-        embed.add_field(name='Spellista:', value=url)
-        await ctx.send(embed=embed)
 
     @commands.command(pass_context = True)
     async def pause(self, ctx):
@@ -293,31 +129,13 @@ class Ljuduppspelning(commands.Cog):
 
     @commands.command(pass_context = True)
     async def clear(self,ctx):
-        files=glob.glob("queue/*.m4a")
-        for f in files[1:]:
-            try:
-                os.remove(f)
-            except:
-                pass
-        await ctx.send("Rensade kön")
 
     @commands.command(pass_context = True)
     async def move(self, ctx, från, till):
-        await self.flytta(från, till)
-        await ctx.send("flyttade låt")
 
     @commands.command(pass_context = True)
     async def remove(self, ctx, nummer):
-        files=glob.glob("queue/*.m4a")
-        fil=files[int(nummer)]
-        file=TinyTag.get(fil)
-        titel="[{}]({})".format(file.title,file.comment)
-        lenght = '{}:{}'.format(math.floor(int(file.duration)/60),int(file.duration)%60)
-        embed=discord.Embed(title="Tog bort en video från kön")
-        embed.set_thumbnail(url="https://media.giphy.com/media/Y2yEuEKZWhXpdR4QsC/giphy.gif")
-        embed.add_field(name='\u200b', value="{}. {} | {}".format(nummer,titel,lenght), inline=False)
-        await ctx.send(embed=embed)
-        os.remove(fil)
+
 
     @commands.command()
     async def ljudtest(self,ctx):
