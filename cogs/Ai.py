@@ -10,7 +10,7 @@ import discord
 from discord.ext import commands
 from PIL import Image
 import torch
-import torch_directml
+# import torch_directml
 from diffusers import StableDiffusionPipeline, AutoPipelineForText2Image
 
 # 3. Local application/library-specific imports
@@ -62,34 +62,34 @@ class Ai(commands.Cog):
             print(f"Message received: {message.content[5:]}")
             await self.cooking(channel, message.content[5:])
 
-    @commands.command(pass_context=True)
-    async def generera(self, ctx, *, prompt: str):
-        pipe = AutoPipelineForText2Image.from_pretrained(
-            "stabilityai/sdxl-turbo",
-            torch_dtype=torch.float16,
-            variant="fp16"
-        )
-        # pipe = AutoPipelineForText2Image.from_pretrained(
-        #     "stabilityai/sd-turbo",
-        #     torch_dtype=torch.float16,
-        #     variant="fp16"
-        # )
-        # pipe = StableDiffusionPipeline.from_pretrained(
-        #     "runwayml/stable-diffusion-v1-5",
-        #     torch_dtype=torch.float16,
-        #     variant="fp16"
-        # )
-        pipe = pipe.to(torch_directml.device())
+    # @commands.command(pass_context=True)
+    # async def generera(self, ctx, *, prompt: str):
+    #     pipe = AutoPipelineForText2Image.from_pretrained(
+    #         "stabilityai/sdxl-turbo",
+    #         torch_dtype=torch.float16,
+    #         variant="fp16"
+    #     )
+    #     # pipe = AutoPipelineForText2Image.from_pretrained(
+    #     #     "stabilityai/sd-turbo",
+    #     #     torch_dtype=torch.float16,
+    #     #     variant="fp16"
+    #     # )
+    #     # pipe = StableDiffusionPipeline.from_pretrained(
+    #     #     "runwayml/stable-diffusion-v1-5",
+    #     #     torch_dtype=torch.float16,
+    #     #     variant="fp16"
+    #     # )
+    #     pipe = pipe.to(torch_directml.device())
 
-        image = pipe(f'{prompt}, photorealistic, 8k',num_inference_steps=4, guidance_scale=0.0).images[0]
-        output_path = "output.png"
-        image.save(output_path)
+    #     image = pipe(f'{prompt}, photorealistic, 8k',num_inference_steps=4, guidance_scale=0.0).images[0]
+    #     output_path = "output.png"
+    #     image.save(output_path)
 
-        # Send the generated file back to Discord
-        await ctx.send(
-            f"Här har du din {prompt}",
-            file=discord.File("output.png")  # must wrap in discord.File
-        )
+    #     # Send the generated file back to Discord
+    #     await ctx.send(
+    #         f"Här har du din {prompt}",
+    #         file=discord.File("output.png")  # must wrap in discord.File
+    #     )
 
     @commands.command(pass_context=True)
     async def tts_test(self, ctx):
