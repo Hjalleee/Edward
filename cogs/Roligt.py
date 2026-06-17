@@ -28,8 +28,6 @@ redditxd = praw.Reddit(client_id=tokens['reddit_client_id'],
                        client_secret=tokens['reddit_client_secret'],
                        user_agent=tokens['reddit_user_agent'])
 
-print(redditxd.read_only)
-
 class Roligt(commands.Cog):
     def __init__(self, bot):
         self.bot = bot

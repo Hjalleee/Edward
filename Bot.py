@@ -28,9 +28,11 @@ async def on_ready():
             try:
                 cog = f"cogs.{cog.replace('.py', '')}"
                 await bot.load_extension(cog)
+                print(f'{cog} loaded')
             except Exception as e:
                 print(f"{cog} reeeeeeeeeeeeeear:")
-                raise e
+                continue
+            
 
 @bot.listen()        
 async def on_message(message):

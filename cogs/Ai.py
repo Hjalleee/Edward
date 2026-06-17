@@ -59,8 +59,8 @@ class Ai(commands.Cog):
 
         elif message.content.startswith('@grok'):
             channel = message.channel
-            print(f"Message received: {message.content}")
-            await self.cooking(channel, message.content)
+            print(f"Message received: {message.content[5:]}")
+            await self.cooking(channel, message.content[5:])
 
     @commands.command(pass_context=True)
     async def generera(self, ctx, *, prompt: str):
@@ -90,6 +90,14 @@ class Ai(commands.Cog):
             f"Här har du din {prompt}",
             file=discord.File("output.png")  # must wrap in discord.File
         )
+
+    @commands.command(pass_context=True)
+    async def tts_test(self, ctx):
+        voice = get(self.bot.voice_clients, guild=ctx.guild)
+        if not voice:
+            channel = ctx.message.author.voice.channel
+            voice = await channel.connect()
+        voice.play(discord.FFmpegPCMAudio("songs\\output.wav"))
 
 
 async def setup(bot):
