@@ -31,6 +31,7 @@ async def on_ready():
                 print(f'{cog} loaded')
             except Exception as e:
                 print(f"{cog} reeeeeeeeeeeeeear:")
+                print(e)
                 continue
             
 

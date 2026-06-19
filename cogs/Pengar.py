@@ -2,6 +2,7 @@
 import asyncio
 import json
 import random
+import os
 from random import randint
 
 # 2. Third-party imports
@@ -9,36 +10,45 @@ import discord
 from discord.ext import commands
 
 #butik
+butik = {
+    'lambsauce' : 50,
+    'brest' : 100
+}
 varor = 'lambsauce','brest'
 
 #priser
 pris = 50, 100
 
+tmp = 'users.json.tmp'
+
 class Pengar(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-
-        self.bot.loop.create_task(self.save_users())
+        self.save_lock = asyncio.Lock()
         #self.bot.loop.create_task(self.ge_pengar())
 
         with open('users.json', 'r') as f:
             self.users = json.load(f)
 
-    async def save_users(self):
+        self.bot.loop.create_task(self.autosave())
+
+    async def autosave(self):
         await self.bot.wait_until_ready()
         while not self.bot.is_closed():
-            with open('users.json', 'w') as f:
-                json.dump(self.users, f, indent=4)
-                f.close()
+            await self.save_users()
+            await asyncio.sleep(10)
 
-            await asyncio.sleep(1)
+    async def save_users(self):
+        async with self.save_lock:
+            with open('users.json.tmp', 'w') as f:
+                json.dump(self.users, f, indent=4)
+            os.replace('users.json.tmp', 'users.json')
 
     async def ge_pengar(self):
         await self.bot.wait_until_ready()
         while not self.bot.is_closed():
             print(self.users)
-
             await asyncio.sleep(1)
 
     async def check_pengar(self, id):
@@ -58,9 +68,7 @@ class Pengar(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-
         id = str(message.author.id)
-
         if id not in self.users:
             self.users[id] = {}
             self.users[id]["pengar"] = 0
@@ -69,7 +77,7 @@ class Pengar(commands.Cog):
         print(msg)
         await self.save_users()
 
-    @commands.command(pass_context = True)
+    @commands.command()
     async def roulette(self, ctx, färg = None, antal = None):
         if (färg=='röd' or färg=='svart' or färg=='grön') and (0 <= int(antal) <= 1000000):
             if await self.check_pengar(str(ctx.message.author.id)) >= int(antal):
@@ -99,9 +107,8 @@ class Pengar(commands.Cog):
             await ctx.send("Skriv korrekt! !help roulette, om du behöver hjälp "+ ctx.message.author.mention)
         await self.save_users()
 
-    @commands.command(pass_context = True)
+    @commands.command()
     async def pengar(self, ctx, user : discord.Member = None, add = None, antal = None):
-
         id = str(ctx.message.author.id)
         try:
             userID = str(user.id)
@@ -135,44 +142,63 @@ class Pengar(commands.Cog):
             await ctx.send("Skriv korrekt! !help pengar, om du behöver hjälp " + ctx.message.author.mention)
         await self.save_users()
 
-    @commands.command(pass_context = True)
+    @commands.command()
     async def butik(self, ctx):
+        msg = ""
+        for k, v in butik.items():
+            msg += f'{k}: {v} pengar\n'
+        await ctx.send(msg)
 
-        for i in range(len(varor)):
-            await ctx.send("{}: {} pengar".format(varor[i], pris[i]))
+    # @commands.command()
+    # async def köp(self, ctx, vara: str = None):
+    #     id = str(ctx.message.author.id)
+    #     if not vara:
+    #         await ctx.send("Välj vad du ska köpa! " + ctx.message.author.mention)
+    #     elif (vara == 'lambsauce'):
+    #         if (await self.check_pengar(id) >= pris[0]):
+    #             await self.add_vara(id, vara)
+    #             await self.add_pengar(id, -pris[0])
+    #             await ctx.send("Du köpte {} för {}! ".format(vara, pris[0]) + ctx.message.author.mention)
+    #             print("{} har {} {}".format(ctx.message.author, self.users[id][vara], vara))
+    #         else:
+    #             await ctx.send("Så rik är du inte " + ctx.message.author.mention)
+    #     elif (vara == 'brest'):
+    #         if (await self.check_pengar(id) >= pris[1]):
+    #             await self.add_vara(id, vara)
+    #             await self.add_pengar(id, -pris[1])
+    #             await ctx.send("Du köpte {} för {}! ".format(vara, pris[1]) + ctx.message.author.mention)
+    #             print("{} har {} {}".format(ctx.message.author, self.users[id][vara], vara))
+    #         else:
+    #             await ctx.send("Så rik är du inte " + ctx.message.author.mention)
+    #     else:
+    #         await ctx.send("{} är inte en vara! Se butiken med !butik ".format(vara) + ctx.message.author.mention)
+    #     await self.save_users()
 
-    @commands.command(pass_context = True)
+    @commands.command()
     async def köp(self, ctx, vara: str = None):
-
         id = str(ctx.message.author.id)
-
         if not vara:
             await ctx.send("Välj vad du ska köpa! " + ctx.message.author.mention)
-        elif (vara == 'lambsauce'):
-            if (await self.check_pengar(id) >= pris[0]):
-                await self.add_vara(id, vara)
-                await self.add_pengar(id, -pris[0])
-                await ctx.send("Du köpte {} för {}! ".format(vara, pris[0]) + ctx.message.author.mention)
-                print("{} har {} {}".format(ctx.message.author, self.users[id][vara], vara))
-            else:
-                await ctx.send("Så rik är du inte " + ctx.message.author.mention)
-        elif (vara == 'brest'):
-            if (await self.check_pengar(id) >= pris[1]):
-                await self.add_vara(id, vara)
-                await self.add_pengar(id, -pris[1])
-                await ctx.send("Du köpte {} för {}! ".format(vara, pris[1]) + ctx.message.author.mention)
-                print("{} har {} {}".format(ctx.message.author, self.users[id][vara], vara))
-            else:
-                await ctx.send("Så rik är du inte " + ctx.message.author.mention)
-        else:
-            await ctx.send("{} är inte en vara! Se butiken med !butik ".format(vara) + ctx.message.author.mention)
+            return
+        
+        if vara not in butik:
+            await ctx.send(f"{vara} är inte en vara! Se butiken med !butik {ctx.message.author.mention}")
+            return
+
+        pris = butik[vara]
+        if await self.check_pengar(id) < pris:
+            await ctx.send("Så rik är du inte " + ctx.message.author.mention)
+
+        await self.add_vara(id, vara)
+        await self.add_pengar(id, pris)
+        await ctx.send(f"Du köpte {vara} för {pris}! {ctx.message.author.mention}")
+        print("{} har {} {}".format(ctx.message.author, self.users[id][vara], vara))
+            
         await self.save_users()
 
-    @commands.command(pass_context = True)
+    @commands.command()
     async def inventarie(self, ctx, user : discord.Member = None):
-
         id = str(ctx.message.author.id)
-
         try:
             userID = str(user.id)
         except:
@@ -187,14 +213,11 @@ class Pengar(commands.Cog):
                 raise e
         await self.save_users()
 
-    @commands.command(pass_context = True)
+    @commands.command()
     async def flex(self,ctx, sak: str = None):
-
         id = str(ctx.message.author.id)
-
         if (self.users[id][sak] > 0) and (str(sak) == "lambsauce"):
             await ctx.send("https://imagesvc.meredithcorp.io/v3/mm/image?url=https%3A%2F%2Fassets.marthastewart.com%2Fstyles%2Fwmax-300%2Fd21%2Fa99872_0303_lambgravy%2Fa99872_0303_lambgravy_vert.jpg%3Fitok%3Dl70m_1A2")
-
         if (self.users[id][sak] > 0) and (str(sak) == "brest"):
             await ctx.send("https://image.shutterstock.com/image-photo/chicken-breast-stuffed-garlic-spinach-260nw-1353766883.jpg")
         await self.save_users()
