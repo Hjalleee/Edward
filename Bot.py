@@ -37,7 +37,7 @@ async def on_ready():
 
 @bot.listen()        
 async def on_message(message):
-    if message.content.startswith('#') and message.channel.id==659563748180099095:
+    if message.content.startswith('#') and message.channel.id==1359579974264422510:
         await message.channel.send('Ditt dumma fan skicka inte i normal chat')  
 
 @bot.command()
