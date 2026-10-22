@@ -5,6 +5,7 @@ import random
 from random import randint
 import subprocess
 from collections import defaultdict, deque
+# from gtts import gTTS
 
 # 2. Third-party library imports
 import discord
@@ -30,6 +31,19 @@ class Ai(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+
+    async def cog_load(self):
+        prompt = ' Du dök precis upp i en discord kanal, introducera dig själv och säg något kul'
+        prompt_full = [
+                    {
+                        'role': 'system',
+                        'content': system_prompt+prompt
+                    }
+        ]
+        bot_channel = self.bot.get_channel(1359580144205037728)
+        async with bot_channel.typing():
+            respons = await self.cooking(prompt_full)
+        await bot_channel.send(respons)
 
     async def get_content(self, message: discord.Message):
         content = message.content
@@ -57,6 +71,11 @@ class Ai(commands.Cog):
     async def on_message(self, message):
         history = conversations[message.channel.id]
         content = await self.get_content(message)
+
+        if message.content.startswith('@grok reset'):
+            conversations[message.channel.id] = []
+            await message.reply("Grok forgor 💀")
+            return
 
         if message.author.bot:
             history.append({

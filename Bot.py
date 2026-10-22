@@ -22,7 +22,6 @@ bot = commands.Bot(command_prefix='#', intents=intents)
 async def on_ready():
     await bot.change_presence(activity=discord.Game('Håller gudstjänst'))
     print('Edward Blom är redo.')
-
     for cog in os.listdir(".\\cogs"):
         if cog.endswith(".py"):
             try:

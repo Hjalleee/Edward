@@ -87,7 +87,10 @@ class Ljuduppspelning(commands.Cog):
             else:
                 embed=discord.Embed(title="Lade till en video i kön", description='')
             embed.set_thumbnail(url="https://media.giphy.com/media/iKHHyziV1ju7nmxywh/giphy.gif")
-            embed.add_field(name='Video', value=f"[{result['title']}]({result['url']})", inline=True)
+            if 'googlevideo' in result['url']:
+                embed.add_field(name='Video', value=f"[{result['title']}]({query})", inline=True)
+            else:
+                embed.add_field(name='Video', value=f"[{result['title']}]({result['url']})", inline=True)
             embed.add_field(name='Längd', value=f"{math.floor(int(result['duration'])/60)}:{int(result['duration'])%60:02}", inline=True)
             await ctx.send(embed=embed)
         if not ctx.voice_client or not ctx.voice_client.is_playing():
@@ -134,7 +137,10 @@ class Ljuduppspelning(commands.Cog):
             )
         embed=discord.Embed(title="Började spela en låt", description='')
         embed.set_thumbnail(url="https://media.giphy.com/media/iKHHyziV1ju7nmxywh/giphy.gif")
-        embed.add_field(name='Video', value=f"[{song['title']}]({song['url']})", inline=True)
+        if 'original_url' in song:
+            embed.add_field(name='Video', value=f"[{song['title']}]({song['original_url']})", inline=True)
+        else:
+            embed.add_field(name='Video', value=f"[{song['title']}]({song['url']})", inline=True)
         embed.add_field(name='Längd', value=f"{math.floor(int(song['duration'])/60)}:{int(song['duration'])%60:02}", inline=True)
         await ctx.send(embed=embed)
         voice.play(source, after=after_playing)
@@ -270,6 +276,19 @@ class Ljuduppspelning(commands.Cog):
 
     @commands.command()
     async def gachi(self,ctx, reset = None):
+        async def gachi_message(ctx,titel):
+            embed=discord.Embed(title="Nu spelas:")
+            embed.set_thumbnail(url="https://media.giphy.com/media/iKHHyziV1ju7nmxywh/giphy.gif")
+            embed.add_field(name='\u200b', value=titel, inline=False)
+            txt_channel = ctx.channel
+            last_message = await txt_channel.fetch_message(txt_channel.last_message_id)
+            if last_message.embeds:
+                found_embed = last_message.embeds[0]
+                if found_embed.title and "Nu spelas:" in found_embed.title:
+                    await last_message.edit(embed=embed)
+            else:
+                await ctx.send(embed=embed)
+
         if reset == "reset":
             source = "gachi/spelad/"
             dest = "gachi/"
@@ -278,17 +297,26 @@ class Ljuduppspelning(commands.Cog):
                 shutil.move(source+f, dest)
             await ctx.send("Resetadde gachi")
         else:
-            def gachi_loop():
+            async def gachi_loop(self):
                 gachi = glob.glob("gachi/*.m4a")
-                if not gachi == []:
+                if gachi:
                     r = random.choice(gachi)
-                    voice.play(discord.FFmpegPCMAudio(r), after = lambda e: (shutil.move(r, "gachi/spelad/"), gachi_loop()))
-                    print("{} spelas".format(r))
+                    await gachi_message(ctx,os.path.basename(r)[:-16])
+                    def after_play(error):
+                        if error:
+                            print(f"Playback error: {error}")
+                        try:
+                            shutil.move(r, "gachi/spelad/")
+                        except Exception as e:
+                            print(f"Move error: {e}")
+                        asyncio.run_coroutine_threadsafe(gachi_loop(self),self.bot.loop)
+                    voice.play(discord.FFmpegPCMAudio(r),after=after_play)
+                    print(f'{os.path.basename(r)[:-16]} spelas')
             voice = get(self.bot.voice_clients, guild = ctx.guild)
             if not voice:
                  channel = ctx.message.author.voice.channel
                  voice = await channel.connect()
-            gachi_loop()
+            await gachi_loop(self)
 
     @commands.command(pass_context = True)
     async def tomtemor(self, ctx):
